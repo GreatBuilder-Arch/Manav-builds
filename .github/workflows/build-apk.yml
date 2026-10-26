@@ -1,0 +1,41 @@
+name: Build APK
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract zip
+        run: |
+          mkdir -p /tmp/src
+          unzip -q -o ./*.zip -d /tmp/src
+          PUBSPEC=$(find /tmp/src -name pubspec.yaml -not -path '*/.*' | head -n 1)
+          echo "APP_DIR=$(dirname "$PUBSPEC")" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.22.2"
+          channel: stable
+          cache: true
+
+      - name: Build APK
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          yes | flutter doctor --android-licenses || true
+          flutter pub get
+          flutter build apk --release --split-per-abi --flavor dev
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: chrono-apk
+          path: ${{ env.APP_DIR }}/build/app/outputs/flutter-apk/*.apk
